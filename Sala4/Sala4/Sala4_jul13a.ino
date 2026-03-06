@@ -78,6 +78,7 @@ void sync_reset() {
   prev_isRaining = isRaining;
   prev_manualLight = manualLight;
   prev_allWindows = allWindows;
+  oldAll = allWindows;
 }
 
 // --- CALLBACKS della sincronizzazione e comunicazione Cloud ---

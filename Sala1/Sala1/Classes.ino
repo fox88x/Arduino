@@ -715,92 +715,56 @@ void initLogging() {
 }
 
 void logWindowStateChange(bool newState, WindowAction action) {
-  messager = String("Sala 1:\n[Windows] ");
-  
+  const char* causa;
   switch (action) {
-    case WINDOW_MANUAL_OPEN:
-      messager = messager + "Apertura MANUALE"; 
-      break;
-    case WINDOW_MANUAL_CLOSE:
-      messager = messager + "Chiusura MANUALE";
-      break;
-    case WINDOW_AUTO_OPEN:
-      messager = messager + "Apertura AUTOMATICA";
-      break;
-    case WINDOW_AUTO_CLOSE:
-      messager = messager + "Chiusura AUTOMATICA";
-      break;
-    case WINDOW_RAIN_CLOSE:
-      messager = messager + "Chiusura per PIOGGIA";
-      break;
-    case WINDOW_SENSOR_ERROR_CLOSE:
-      messager = messager + "Chiusura di SICUREZZA (errore sensore pioggia)";
-      break;
-    case WINDOW_SEND_ALL_OPEN:
-      messager = messager + "Apertura TOTALE (invio comando all)";
-      break;
-    case WINDOW_SEND_ALL_CLOSE:
-      messager = messager + "Chiusura TOTALE (invio comando all)";
-      break;
-    case WINDOW_ALL_OPEN:
-      messager = messager + "Apertura TOTALE (comando remoto)";
-      break;
-    case WINDOW_ALL_CLOSE:
-      messager = messager + "Chiusura TOTALE (comando remoto)";
-      break;
-    default:
-      messager = messager + "Causa SCONOSCIUTA";
-      break;
+    case WINDOW_MANUAL_OPEN:       causa = "Apertura MANUALE"; break;
+    case WINDOW_MANUAL_CLOSE:      causa = "Chiusura MANUALE"; break;
+    case WINDOW_AUTO_OPEN:         causa = "Apertura AUTOMATICA"; break;
+    case WINDOW_AUTO_CLOSE:        causa = "Chiusura AUTOMATICA"; break;
+    case WINDOW_RAIN_CLOSE:        causa = "Chiusura per PIOGGIA"; break;
+    case WINDOW_SENSOR_ERROR_CLOSE:causa = "Chiusura di SICUREZZA (errore sensore pioggia)"; break;
+    case WINDOW_SEND_ALL_OPEN:     causa = "Apertura TOTALE (invio comando all)"; break;
+    case WINDOW_SEND_ALL_CLOSE:    causa = "Chiusura TOTALE (invio comando all)"; break;
+    case WINDOW_ALL_OPEN:          causa = "Apertura TOTALE (comando remoto)"; break;
+    case WINDOW_ALL_CLOSE:         causa = "Chiusura TOTALE (comando remoto)"; break;
+    default:                       causa = "Causa SCONOSCIUTA"; break;
   }
-  
-  messager = messager + "\nW_State: " + (newState ? "APERTE" : "CHIUSE") + "\n";
+  char msg[128];
+  snprintf(msg, sizeof(msg), "Sala 1:\n[Windows] %s\nW_State: %s\n", causa, newState ? "APERTE" : "CHIUSE");
+  messager = msg;
 }
 
 void logLightStateChange(bool newState, LightAction action) {
-  messager = String("[Light] ") + (newState ? "ACCESA" : "SPENTA") + " - ";
-  
- switch (action) {
-    case LIGHT_AUTO_ON:
-      messager = messager + "Accensione AUTOMATICA\n";
-      break;
-    case LIGHT_AUTO_OFF:
-      messager = messager + "Spegnimento AUTOMATICO\n";
-      break;
-    case LIGHT_MANUAL_ON:
-      messager = messager + "Accensione MANUALE\n";
-      break;
-    case LIGHT_MANUAL_OFF:
-      messager = messager + "Spegnimento MANUALE (timeout)\n";
-      break;
-    default:
-      messager = messager + "Causa SCONOSCIUTA\n";
-      break;
+  const char* causa;
+  switch (action) {
+    case LIGHT_AUTO_ON:   causa = "Accensione AUTOMATICA"; break;
+    case LIGHT_AUTO_OFF:  causa = "Spegnimento AUTOMATICO"; break;
+    case LIGHT_MANUAL_ON: causa = "Accensione MANUALE"; break;
+    case LIGHT_MANUAL_OFF:causa = "Spegnimento MANUALE (timeout)"; break;
+    default:              causa = "Causa SCONOSCIUTA"; break;
   }
+  char msg[96];
+  snprintf(msg, sizeof(msg), "[Light] %s - %s\n", newState ? "ACCESA" : "SPENTA", causa);
+  messager = msg;
 }
 
 void logRainStateChange(float newVal, RainAction action) {
-  messager = "[Rain Sensor]: ";
-  
+  char msg[96];
   switch (action) {
     case CALIB_START:
-      messager = messager + "Calibrazione automatica avviata.\n";
-      break;
+      snprintf(msg, sizeof(msg), "[Rain Sensor]: Calibrazione automatica avviata.\n"); break;
     case NEW_VAL:
-      messager = messager + "\n Nuova soglia aggiornata: " + String(newVal) + "\n";
-      break;
+      snprintf(msg, sizeof(msg), "[Rain Sensor]: Nuova soglia aggiornata: %d\n", (int)newVal); break;
     case CALIB_STOP:
-      messager = messager + "Calibrazione automatica completata.\n";
-      break;
+      snprintf(msg, sizeof(msg), "[Rain Sensor]: Calibrazione automatica completata.\n"); break;
     case CALIB_TIMEOUT_STOP:
-      messager = messager + "Time-out scaduto. Calibrazione automatica arrestata.\n";
-      break;
+      snprintf(msg, sizeof(msg), "[Rain Sensor]: Time-out scaduto. Calibrazione arrestata.\n"); break;
     case RAIN_ERROR:
-      messager = messager + "Errore, sensore pioggia non riconosciuto\n";
-      break;
+      snprintf(msg, sizeof(msg), "[Rain Sensor]: Errore, sensore pioggia non riconosciuto\n"); break;
     default:
-      messager = messager + "Errore SCONOSCIUTO\n";
-      break;
+      snprintf(msg, sizeof(msg), "[Rain Sensor]: Errore SCONOSCIUTO\n"); break;
   }
+  messager = msg;
 }
 
 void setWindowAction(WindowAction action) {

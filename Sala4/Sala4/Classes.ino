@@ -217,45 +217,23 @@ void initLogging() {
 }
 
 void logWindowStateChange(bool newState, WindowAction action) {
-  messager = String("Sala 4:\n[Windows] ");
-  
+  const char* causa;
   switch (action) {
-    case WINDOW_MANUAL_OPEN:
-      messager = messager + "Apertura MANUALE"; 
-      break;
-    case WINDOW_MANUAL_CLOSE:
-      messager = messager + "Chiusura MANUALE";
-      break;
-    case WINDOW_AUTO_OPEN:
-      messager = messager + "Apertura AUTOMATICA";
-      break;
-    case WINDOW_AUTO_CLOSE:
-      messager = messager + "Chiusura AUTOMATICA";
-      break;
-    case WINDOW_RAIN_CLOSE:
-      messager = messager + "Chiusura per PIOGGIA";
-      break;
-    case WINDOW_SENSOR_ERROR_CLOSE:
-      messager = messager + "Chiusura di SICUREZZA (errore sensore pioggia)";
-      break;
-    case WINDOW_SEND_ALL_OPEN:
-      messager = messager + "Apertura TOTALE (invio comando all)";
-      break;
-    case WINDOW_SEND_ALL_CLOSE:
-      messager = messager + "Chiusura TOTALE (invio comando all)";
-      break;
-    case WINDOW_ALL_OPEN:
-      messager = messager + "Apertura TOTALE (comando remoto)";
-      break;
-    case WINDOW_ALL_CLOSE:
-      messager = messager + "Chiusura TOTALE (comando remoto)";
-      break;
-    default:
-      messager = messager + "Causa SCONOSCIUTA";
-      break;
+    case WINDOW_MANUAL_OPEN:       causa = "Apertura MANUALE"; break;
+    case WINDOW_MANUAL_CLOSE:      causa = "Chiusura MANUALE"; break;
+    case WINDOW_AUTO_OPEN:         causa = "Apertura AUTOMATICA"; break;
+    case WINDOW_AUTO_CLOSE:        causa = "Chiusura AUTOMATICA"; break;
+    case WINDOW_RAIN_CLOSE:        causa = "Chiusura per PIOGGIA"; break;
+    case WINDOW_SENSOR_ERROR_CLOSE:causa = "Chiusura di SICUREZZA (errore sensore pioggia)"; break;
+    case WINDOW_SEND_ALL_OPEN:     causa = "Apertura TOTALE (invio comando all)"; break;
+    case WINDOW_SEND_ALL_CLOSE:    causa = "Chiusura TOTALE (invio comando all)"; break;
+    case WINDOW_ALL_OPEN:          causa = "Apertura TOTALE (comando remoto)"; break;
+    case WINDOW_ALL_CLOSE:         causa = "Chiusura TOTALE (comando remoto)"; break;
+    default:                       causa = "Causa SCONOSCIUTA"; break;
   }
-  
-  messager = messager + "\nW_State: " + (newState ? "APERTE" : "CHIUSE") + "\n";
+  char msg[128];
+  snprintf(msg, sizeof(msg), "Sala 4:\n[Windows] %s\nW_State: %s\n", causa, newState ? "APERTE" : "CHIUSE");
+  messager = msg;
 }
 
 /*

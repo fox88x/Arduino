@@ -84,6 +84,7 @@ void sync_reset() {
   prev_isRaining = isRaining;
   prev_manualLight = manualLight;
   prev_allWindows = allWindows;
+  oldAll = allWindows;
   prev_lightState = lightState;
 }
 
