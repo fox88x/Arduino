@@ -1,126 +1,125 @@
-// WindowsManagment.ino
-unsigned long allStartTime = 0;
-unsigned long relayStartTime = 0;   // Timer unificato per il relè attivo
-int activeRelay = 0;                // 0 = nessuno, 1 = apertura, 2 = chiusura
+// WindowsManagment.ino — Sala1 — State Machine
+//
+// Stati: WIN_IDLE → WIN_RELAY_PAUSE → WIN_MOVING → WIN_IDLE
 
-unsigned long now = 0;
-unsigned long button1StartTime = 0;
-unsigned long button2StartTime = 0;
+// ===================== STATO FINESTRE =====================
+WinState winState      = WIN_IDLE;
+WinPos   winPos        = WIN_CLOSED;
+int      pendingPin    = 0;
+unsigned long winTimer = 0;
 
-bool isSender = false;
+// ===================== ALLWINDOWS =====================
+int  oldAll            = 0;
+bool isSender          = false;
+unsigned long allStart = 0;
 
-// Pausa non bloccante tra spegnimento relè opposto e accensione nuovo
-int pendingRelayPin = 0;            // 0 = nessuna attivazione in attesa
-unsigned long pendingRelayTime = 0;
-const unsigned long RELAY_SWITCH_PAUSE = 500;
+// ===================== PULSANTI =====================
+unsigned long btn1Start = 0;
+unsigned long btn2Start = 0;
 
-
-void processButton(Bounce2::Button& button, unsigned long& startTime, int buttonPin, int relayPin, int commandValue) {
-  if (button.fell()) {
+// ===================== BUTTON HANDLER =====================
+void processButton(Bounce2::Button& btn, unsigned long& startTime, int relayPin, int cmdValue) {
+  if (btn.fell()) {
     startTime = millis();
   }
 
-  if (button.rose()) {
-    unsigned long duration = millis() - startTime;
+  if (btn.rose()) {
+    unsigned long dur = millis() - startTime;
 
-    if (duration < shortPressTimer) {
-
-      WindowAction action = (relayPin == OPEN_W_PIN) ? WINDOW_MANUAL_OPEN : WINDOW_MANUAL_CLOSE;
-      setWindowAction(action);
-
-      activateWindowsRelay(relayPin);
+    if (dur < SHORT_PRESS_MS) {
+      setWindowAction((relayPin == OPEN_W_PIN) ? WINDOW_MANUAL_OPEN : WINDOW_MANUAL_CLOSE);
+      activateRelay(relayPin);
     }
-    else if (duration >= shortPressTimer && duration < prolongedPressTimer) {
-      // Comando ALL sempre permesso
-      allWindows = commandValue;
+    else if (dur < LONG_PRESS_MS) {
+      allWindows = cmdValue;
       isSender = true;
-      activateWindowsRelay(relayPin);
-
-      WindowAction action = (relayPin == OPEN_W_PIN) ? WINDOW_SEND_ALL_OPEN : WINDOW_SEND_ALL_CLOSE;
-      setWindowAction(action);
-
+      setWindowAction((relayPin == OPEN_W_PIN) ? WINDOW_SEND_ALL_OPEN : WINDOW_SEND_ALL_CLOSE);
+      activateRelay(relayPin);
       Led1.start(sequence11, numSteps11);
     }
     else {
-      // Modifica impostazioni
-      if (commandValue == 1) {
-          //auto_w = !auto_w;
-      }
-      else {
+      if (cmdValue == 1) {
+        // Riservato per future impostazioni
+      } else {
         manualLight = !manualLight;
       }
     }
   }
 }
 
-// GESTIONE DEI PULSANTI E controllo dei relè
-void checkWindows() {
-  now = millis();
+// ===================== ATTIVAZIONE RELAY =====================
+void activateRelay(int relayPin) {
+  if (winState == WIN_MOVING) return;
+
+  int opposite = (relayPin == OPEN_W_PIN) ? CLOSE_W_PIN : OPEN_W_PIN;
+  digitalWrite(opposite, LOW);
+
+  pendingPin = relayPin;
+  winTimer   = millis();
+  winState   = WIN_RELAY_PAUSE;
+}
+
+// ===================== STATE MACHINE FINESTRE =====================
+void updateWindows() {
+  unsigned long now = millis();
   button1.update();
   button2.update();
 
-  // Completamento attivazione relè dopo pausa non bloccante
-  if (pendingRelayPin != 0 && (now - pendingRelayTime >= RELAY_SWITCH_PAUSE)) {
-    digitalWrite(pendingRelayPin, HIGH);
-    activeRelay = (pendingRelayPin == OPEN_W_PIN) ? 1 : 2;
-    relayStartTime = now;
-    windowState = 0; // in transizione
-    pendingRelayPin = 0;
+  switch (winState) {
+
+    case WIN_IDLE:
+      break;
+
+    case WIN_RELAY_PAUSE:
+      if (now - winTimer >= RELAY_SWITCH_PAUSE_MS) {
+        digitalWrite(pendingPin, HIGH);
+        winTimer = now;
+        winPos   = WIN_TRANSIT;
+        winState = WIN_MOVING;
+      }
+      break;
+
+    case WIN_MOVING:
+      if (now - winTimer >= WINDOW_MOVE_MS) {
+        digitalWrite(pendingPin, LOW);
+        if (pendingPin == OPEN_W_PIN) {
+          winPos  = WIN_OPEN;
+          w_STATE = true;
+        } else {
+          winPos  = WIN_CLOSED;
+          w_STATE = false;
+        }
+        pendingPin = 0;
+        winState   = WIN_IDLE;
+      }
+      break;
   }
 
-  // Gestione dei pulsanti
-  processButton(button1, button1StartTime, BUTTON1_PIN, OPEN_W_PIN, 1);
-  processButton(button2, button2StartTime, BUTTON2_PIN, CLOSE_W_PIN, 2);
+  // Pulsanti
+  processButton(button1, btn1Start, OPEN_W_PIN, 1);
+  processButton(button2, btn2Start, CLOSE_W_PIN, 2);
 
-
+  // Comando allWindows ricevuto da remoto
   if (oldAll != allWindows) {
-    if(!isSender) {
+    if (!isSender) {
       switch (allWindows) {
         case 1:
           setWindowAction(WINDOW_ALL_OPEN);
-          activateWindowsRelay(OPEN_W_PIN);
+          activateRelay(OPEN_W_PIN);
           break;
         case 2:
           setWindowAction(WINDOW_ALL_CLOSE);
-          activateWindowsRelay(CLOSE_W_PIN);
+          activateRelay(CLOSE_W_PIN);
           break;
       }
     }
-
-    allStartTime = now;
-    oldAll = allWindows;
+    allStart = now;
+    oldAll   = allWindows;
     isSender = false;
   }
 
-  if (allWindows != 0) {
-    if(now - allStartTime > allTimer) {
-        allWindows = 0;
-    }
+  // Timeout allWindows
+  if (allWindows != 0 && (now - allStart > ALL_CMD_TIMEOUT_MS)) {
+    allWindows = 0;
   }
-
-  // Disattivazione del relè attivo dopo il tempo prestabilito
-  if (activeRelay != 0 && (now - relayStartTime >= windowMovementTimer)) {
-    if (activeRelay == 1) {
-      digitalWrite(OPEN_W_PIN, LOW);
-      windowState = 1; // finestra aperta
-      w_STATE = true;
-    }
-    else if (activeRelay == 2) {
-      digitalWrite(CLOSE_W_PIN, LOW);
-      windowState = -1; // finestra chiusa
-      w_STATE = false;
-    }
-    unsigned long elapsed = now - relayStartTime;
-    activeRelay = 0;
-  }
-}
-
-void activateWindowsRelay(int windowsRelayPin) {
-  // Determina il relè opposto:
-  int oppositeRelay = (windowsRelayPin == OPEN_W_PIN) ? CLOSE_W_PIN : OPEN_W_PIN;
-  digitalWrite(oppositeRelay, LOW);
-
-  // Avvia pausa non bloccante prima di accendere il nuovo relè
-  pendingRelayPin = windowsRelayPin;
-  pendingRelayTime = now;
 }

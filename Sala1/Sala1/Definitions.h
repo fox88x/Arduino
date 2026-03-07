@@ -1,77 +1,92 @@
-//Definitions.h
-const byte BUTTON1_PIN = 7;            // Pin del pulsante di apertura
-const byte BUTTON2_PIN = 8;            // Pin del pulsante di chiusura
+// Definitions.h — Sala1 (Nano ESP32)
+#pragma once
 
-const byte OPEN_W_PIN = 2;             // Pin dell'attuatore apri 
-const byte CLOSE_W_PIN = 3;            // Pin dell'attuatore chiudi       
-const byte LIGHT_ON_PIN = 4;
-const byte LIGHT_OFF_PIN = 5;
-
-const byte DHT_SENSOR_PIN = A0;
+// ===================== PIN =====================
+const byte BUTTON1_PIN     = 7;
+const byte BUTTON2_PIN     = 8;
+const byte OPEN_W_PIN      = 2;
+const byte CLOSE_W_PIN     = 3;
+const byte LIGHT_ON_PIN    = 4;
+const byte LIGHT_OFF_PIN   = 5;
+const byte DHT_SENSOR_PIN  = A0;
 const byte RAIN_SENSOR_PIN = A1;
-const byte NTC_SENSOR_PIN = A2;  
+const byte NTC_SENSOR_PIN  = A2;
 const byte LIGHT_SENSOR_PIN = A3;
-const byte HEATER_PIN = 10;
+const byte HEATER_PIN      = 10;
+const byte LED_PIN         = 9;
+const byte LED_COUNT       = 16;
 
-const byte LED_PIN = 9;                //NeoPixal Led
-const byte LED_COUNT = 16;             //n led NeoPixal
+// ===================== SYSTEM STATE =====================
+enum SysState : uint8_t {
+  SYS_BOOT,
+  SYS_RUNNING,
+  SYS_DISCONNECTED
+};
 
-///////////////////////////////////////////SYNC TIMER////////////////////////////////////////////////////
-const unsigned long SYNC_FAST_INTERVAL =        10000;       // 10 secondi
-const unsigned long SYNC_SLOW_INTERVAL =    3600000UL;       // 1 ora
+// ===================== WINDOW STATE MACHINE =====================
+enum WinState : uint8_t {
+  WIN_IDLE,
+  WIN_RELAY_PAUSE,
+  WIN_MOVING
+};
 
-//////////////////////////////////////////WINDOWS TIMER//////////////////////////////////////////////////
-const int windowMovementTimer =                18000;          // tempo di movimentazione finestre
-const int shortPressTimer =                     1500;          // tempo pressione breve del pulsante 
-const unsigned long prolongedPressTimer =       6000;          // Pressione prolungata > 6s
-const int allTimer =                         30*1000;          // durata comando allWindows
-const unsigned long AUTOWINDOWS_INTERVAL =     30000;          // timer controllo movimentazione automatica finestre
+enum WinPos : int8_t {
+  WIN_CLOSED  = -1,
+  WIN_TRANSIT =  0,
+  WIN_OPEN    =  1
+};
 
-///////////////////////////////////////////////LIGHT/////////////////////////////////////////////////////
-const unsigned long MIN_PULSE_INTERVAL = 10;  // Filtro anti-rimbalzo (microseconds)
-const int LIGHT_THRESHOLD = 10;                 //valore di thresold per la luminosità esterna
-const int LIGHT_OFFSET = 5; 
-const int lightRelayTimer =                        2000;       //tempo movimentazione relè luce
-const int MANUAL_TIMER =                 60 * 60 * 1000;       //durata timer manuale luci
-static const unsigned long LIGHT_CHECK_INTERVAL = 10000;       // timer controllo luci
+// ===================== LIGHT RELAY STATE =====================
+enum LightRelayState : uint8_t {
+  LRELAY_IDLE,
+  LRELAY_PAUSE,
+  LRELAY_PULSING
+};
 
-////////////////////////////////////////////////RAIN/////////////////////////////////////////////////////
-const unsigned long REFERENCE_FREQUENCY = 9227;
-const float REFERENCE_CAPACITANCE = 100;
-const float WET_THRESHOLD_PERCENT = 10.0;  // Soglia 10% per bagnato
+// ===================== TIMERS =====================
+// System
+const unsigned long DISCONNECT_RESET_MS     = 5UL * 60 * 1000;
 
-static const unsigned long RAIN_CHECK_INTERVAL =        2000;       // timer controllo sensore pioggia
-static const unsigned long CALIBRATION_INTERVAL =       30 * 60 * 1000;       //durata rutine calibrazione in caso di pioggia
-static const unsigned long RECURSIVE_CALIBRATION_TIMEOUT = 8UL * 60UL * 60UL * 1000UL; // 8 ore timeout calibrazione ricorsiva
+// Time sync
+const unsigned long SYNC_FAST_INTERVAL      = 10000;
+const unsigned long SYNC_SLOW_INTERVAL      = 3600000UL;
+const uint8_t       SYNC_FAIL_MAX           = 6;
 
-///////////////////////////////////////////////TEMP SENSOR///////////////////////////////////////////////
-const float VCC = 3.13;              // Tensione reale misurata
-const float R_FIXED = 10030.0;
-const float R_NOMINAL = 782.0;     // Resistenza termistore calcolata dal parallelo
-const float T_NOMINAL = 27;       // Temperatura ambiente misurata
-const float B_COEFFICIENT = 3950.0;  // Coefficiente B per termistore ~10kΩ
+// Windows
+const unsigned long WINDOW_MOVE_MS          = 18000;
+const unsigned long RELAY_SWITCH_PAUSE_MS   = 500;
+const unsigned long SHORT_PRESS_MS          = 1500;
+const unsigned long LONG_PRESS_MS           = 6000;
+const unsigned long ALL_CMD_TIMEOUT_MS      = 30000UL;
 
-const int NUM_SAMPLES = 10;
+// Light
+const unsigned long LIGHT_RELAY_MS          = 2000;
+const unsigned long LIGHT_RELAY_PAUSE_MS    = 500;
+const int           LIGHT_THRESHOLD         = 10;
+const int           LIGHT_OFFSET            = 5;
+const unsigned long LIGHT_CHECK_INTERVAL    = 10000;
+const unsigned long MANUAL_TIMER            = 60UL * 60 * 1000;
 
-static const unsigned long NTC_CHECK_INTERVAL = 10000;
-static const unsigned long DHT_CHECK_INTERVAL = 10000;
+// Rain sensor
+const unsigned long MIN_PULSE_INTERVAL      = 10;
+const unsigned long REFERENCE_FREQUENCY     = 9227;
+const float         REFERENCE_CAPACITANCE   = 100;
+const float         WET_THRESHOLD_PERCENT   = 10.0;
+const unsigned long RAIN_CHECK_INTERVAL     = 2000;
+const unsigned long CALIBRATION_INTERVAL    = 30UL * 60 * 1000;
+const unsigned long RECURSIVE_CALIBRATION_TIMEOUT = 8UL * 60 * 60 * 1000;
 
+// Temperature sensors
+const float VCC           = 3.13;
+const float R_FIXED       = 10030.0;
+const float R_NOMINAL     = 782.0;
+const float T_NOMINAL     = 27;
+const float B_COEFFICIENT = 3950.0;
+const int   NUM_SAMPLES   = 10;
+const unsigned long NTC_CHECK_INTERVAL = 10000;
+const unsigned long DHT_CHECK_INTERVAL = 10000;
+
+// Heater
 const int SETPOINT = 24;
-const int HYST = 2;
-const int HYST2 = 1;
-
-//////////////////////////////////////////MAIN VARIABLES/////////////////////////////////////////////////
-int oldSystemState = 0, oldAll = 0;
-bool rst = true;
-int windowState = 0;
-bool syncState = false;
-bool firstSyncDone = false;
-char buf[64];
-
-//////////////////////////////////////PREVIUS MAIN VARIABLES/////////////////////////////////////////////
-bool prev_isRaining = false;
-bool prev_w_STATE = false;
-bool prev_manualLight = false;
-int prev_allWindows = 0;
-bool prev_lightState = false;
-bool firstSync = true;
+const int HYST     = 2;
+const int HYST2    = 1;

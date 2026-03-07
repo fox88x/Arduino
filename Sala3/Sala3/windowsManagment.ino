@@ -1,4 +1,4 @@
-// windowsManagment.ino — Sala2 — State Machine
+// windowsManagment.ino — Sala3 — State Machine
 //
 // Stati: WIN_IDLE → WIN_RELAY_PAUSE → WIN_MOVING → WIN_IDLE
 

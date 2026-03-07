@@ -1,9 +1,8 @@
-//Classes.h
+// Classes.h — Sala1
 #pragma once
 
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
-
 
 // ------------------------------------
 // Timers
@@ -35,7 +34,6 @@ private:
   bool _everStarted           = false;
 };
 
-
 // ===============================
 // FREQUENCY SENSOR CLASS
 // ===============================
@@ -44,14 +42,14 @@ private:
   volatile unsigned long pulseCount;
   volatile unsigned long lastPulseTime;
   int sensorPin;
-  
+
 public:
   FrequencySensor(int pin);
   void begin();
   void startMeasurement();
   unsigned long getFrequency(unsigned long measurementInterval);
   static void IRAM_ATTR pulseISR();
-  
+
   static FrequencySensor* instance;
 };
 
@@ -70,11 +68,9 @@ private:
   bool calibrating;
   bool recursiveCalibrationActive;
   unsigned long recursiveStartTime;
-  
-  // NUOVO: Gestione stato di errore
-  bool sensorErrorState;           // Indica se il sensore è in errore
-  bool firstErrorOccurred;         // Flag per tracciare la prima occorrenza dell'errore
-  
+  bool sensorErrorState;
+  bool firstErrorOccurred;
+
 public:
   RainDetector();
   void updateFrequency(unsigned long freq);
@@ -82,17 +78,15 @@ public:
   float getRainValue();
   bool getIsWet();
   float getCurrentCapacitance();
-  
-  // NUOVO: Metodi per gestione errore
+
   bool isSensorInError();
   bool isFirstError();
   void resetFirstErrorFlag();
-  
-  // Metodi per calibrazione ricorsiva
+
   void startRecursiveCalibration();
   bool processRecursiveCalibration();
   void stopRecursiveCalibration();
-  
+
   void printDebugInfo();
 };
 
@@ -103,7 +97,7 @@ class RainSensor {
 private:
   FrequencySensor* sensor;
   RetriggerableTimer measurementTimer, newCalTimer;
-  
+
 public:
   RainDetector* detector;
 
@@ -111,7 +105,7 @@ public:
   ~RainSensor();
   void begin();
   void update();
-  void calibrate();  // Metodo pubblico per calibrazione
+  void calibrate();
   bool newCal = false;
 };
 
@@ -120,45 +114,38 @@ public:
 // ------------------------------------
 class LightSensor {
 public:
-    LightSensor();
-    void update();
-    void init();
-    float light;
-    bool night = false;
-    
-private:
-    RetriggerableTimer lightUpdateDelay;
-    float alfa = 0.5;
-    float getLight();
-};
+  LightSensor();
+  void update();
+  void init();
+  float light;
+  bool night = false;
 
+private:
+  RetriggerableTimer lightUpdateDelay;
+  float alfa = 0.5;
+  float getLight();
+};
 
 // ------------------------------------
 // NTC
 // ------------------------------------
 class NTC_Sensor {
 private:
-    int _pin;                     
-    unsigned long lastReadTime;
-    float temp_temperature;
-
-    RetriggerableTimer ntcUpdateDelay;
-
-    float getAverageADC();
-    float calculateResistance();
-    float readTemperature();
+  int _pin;
+  unsigned long lastReadTime;
+  float temp_temperature;
+  RetriggerableTimer ntcUpdateDelay;
+  float getAverageADC();
+  float calculateResistance();
+  float readTemperature();
 
 public:
-    //Costruttore
-    NTC_Sensor();
-
-    void init();
-    void update();
-    float getTemperature();
-
-    int temperature;
+  NTC_Sensor();
+  void init();
+  void update();
+  float getTemperature();
+  int temperature;
 };
-
 
 // ------------------------------------
 // DHT
@@ -167,19 +154,16 @@ class DHT_Sensor {
 public:
   DHT_Sensor();
   void update();
-
   int temperature;
 
-  // Constants to represent error codes.
-  static const int ERROR_CHECKSUM = 254;    // Error code indicating checksum mismatch.
-  static const int ERROR_TIMEOUT = 253;     // Error code indicating a timeout occurred during reading.
-  static const int TIMEOUT_DURATION = 1000; // Duration (in milliseconds) to wait before timing out.
+  static const int ERROR_CHECKSUM = 254;
+  static const int ERROR_TIMEOUT = 253;
+  static const int TIMEOUT_DURATION = 1000;
   static String getErrorString(int errorCode);
 
 private:
   RetriggerableTimer dhtUpdateDelay;
-
-  int _pin;  
+  int _pin;
   int temp_temperature;
   int readRawData(byte data[5]);
   byte readByte();
@@ -187,43 +171,40 @@ private:
   int readTemperature();
 };
 
-
 // ------------------------------------
 // Heather
 // ------------------------------------
 class Heather {
 public:
-    Heather();
-    void on();
-    void on_duty_cycle();
-    void onPWM();
-    void off();
+  Heather();
+  void on();
+  void on_duty_cycle();
+  void onPWM();
+  void off();
 private:
-    bool isFirstCall = true;
-    RetriggerableTimer heaterOffDelay;
-    RetriggerableTimer heaterOnDelay;
-    RetriggerableTimer heaterDurationDelay;
+  bool isFirstCall = true;
+  RetriggerableTimer heaterOffDelay;
+  RetriggerableTimer heaterOnDelay;
+  RetriggerableTimer heaterDurationDelay;
 };
-
 
 // ------------------------------------
 // Calendar
 // ------------------------------------
 class Calendar {
 public:
-    struct tm timeinfo;
-    bool isWorkingDay();
-    bool isWorkingTime();
-    void printCurrentTime();
-    void updateTime();
+  struct tm timeinfo;
+  bool isWorkingDay();
+  bool isWorkingTime();
+  void printCurrentTime();
+  void updateTime();
 private:
-    int hours = 0;
-    int minutes = 0;
+  int hours = 0;
+  int minutes = 0;
 };
 
-
 // ------------------------------------
-// Sequenza Step
+// SequenceStep
 // ------------------------------------
 class SequenceStep {
 public:
@@ -237,7 +218,6 @@ public:
     : SequenceStep(((uint32_t)r << 16) | ((uint32_t)g << 8) | b, durationMs) {}
 };
 
-
 // ------------------------------------
 // NP_Led
 // ------------------------------------
@@ -246,14 +226,10 @@ public:
   NP_Led(uint16_t numPix, uint8_t pin);
   void begin();
 
-  // Sequenza classica
   void start(const SequenceStep* seq, uint8_t len);
-  // Modalità continua: riceve raw hex 0xRRGGBB
   void startContinuous(uint32_t colorHex);
 
-  // Imposta livello di dimming per la modalità continua (0-255)
   void setContinuousBrightness(uint8_t b);
-  // Imposta brightness globale per le sequenze
   void setSequenceBrightness(uint8_t b);
 
   bool update();
@@ -266,20 +242,18 @@ private:
   const SequenceStep* sequence;
   uint8_t         sequenceLen;
 
-  bool            active;             // true durante esecuzione sequenza
+  bool            active;
   uint8_t         currentStep;
   uint32_t        lastChange;
 
-  uint8_t         continuousBrightness; // livello di dimming continuo
-  uint8_t         sequenceBrightness;   // brightness per sequenze
-  uint32_t        continuousHex;        // raw hex colore continuo
+  uint8_t         continuousBrightness;
+  uint8_t         sequenceBrightness;
+  uint32_t        continuousHex;
 };
 
-
 // ------------------------------------
-// Log
+// Log — Action Tracking
 // ------------------------------------
-// ===== ENUM PER IDENTIFICARE LE CAUSE DEI CAMBIAMENTI =====
 enum WindowAction {
   WINDOW_MANUAL_OPEN,
   WINDOW_MANUAL_CLOSE,
@@ -304,7 +278,7 @@ enum LightAction {
 
 enum RainAction {
   RAIN_ERROR,
-  RAIN_RECOVERY,    // NUOVO: Recupero del sensore
+  RAIN_RECOVERY,
   CALIB_START,
   CALIB_STOP,
   CALIB_TIMEOUT_STOP,
@@ -312,17 +286,14 @@ enum RainAction {
   RAIN_UNKNOWN
 };
 
-// ===== VARIABILI GLOBALI PER IL TRACKING =====
 extern WindowAction lastWindowAction;
 extern LightAction lastLightAction;
 extern RainAction lastRainAction;
 
-// ===== DICHIARAZIONI DELLE FUNZIONI =====
 void initLogging();
 void logWindowStateChange(bool newState, WindowAction action);
 void logLightStateChange(bool newState, LightAction action);
 void logRainStateChange(float newVal, RainAction action);
-void logTFavorableChange(bool newValue, int tempIn, int tempOut);
 void setWindowAction(WindowAction action);
 void setLightAction(LightAction action);
 void setRainAction(RainAction action);

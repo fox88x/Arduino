@@ -1,8 +1,8 @@
+// Classes.h — Sala3
 #pragma once
 
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
-
 
 // ------------------------------------
 // Timers
@@ -34,25 +34,23 @@ private:
   bool _everStarted           = false;
 };
 
-
 // ------------------------------------
 // Calendar
 // ------------------------------------
 class Calendar {
 public:
-    struct tm timeinfo;
-    bool isWorkingDay();
-    bool isWorkingTime();
-    void printCurrentTime();
-    void updateTime();
+  struct tm timeinfo;
+  bool isWorkingDay();
+  bool isWorkingTime();
+  void printCurrentTime();
+  void updateTime();
 private:
-    int hours = 0;
-    int minutes = 0;
+  int hours = 0;
+  int minutes = 0;
 };
 
-
 // ------------------------------------
-// Sequenza Step
+// SequenceStep
 // ------------------------------------
 class SequenceStep {
 public:
@@ -74,14 +72,10 @@ public:
   NP_Led(uint16_t numPix, uint8_t pin);
   void begin();
 
-  // Sequenza classica
   void start(const SequenceStep* seq, uint8_t len);
-  // Modalità continua: riceve raw hex 0xRRGGBB
   void startContinuous(uint32_t colorHex);
 
-  // Imposta livello di dimming per la modalità continua (0-255)
   void setContinuousBrightness(uint8_t b);
-  // Imposta brightness globale per le sequenze
   void setSequenceBrightness(uint8_t b);
 
   bool update();
@@ -94,18 +88,17 @@ private:
   const SequenceStep* sequence;
   uint8_t         sequenceLen;
 
-  bool            active;             // true durante esecuzione sequenza
+  bool            active;
   uint8_t         currentStep;
   uint32_t        lastChange;
 
-  uint8_t         continuousBrightness; // livello di dimming continuo
-  uint8_t         sequenceBrightness;   // brightness per sequenze
-  uint32_t        continuousHex;        // raw hex colore continuo
+  uint8_t         continuousBrightness;
+  uint8_t         sequenceBrightness;
+  uint32_t        continuousHex;
 };
 
-
 // ------------------------------------
-// Log
+// Log — Window Action Tracking
 // ------------------------------------
 enum WindowAction {
   WINDOW_MANUAL_OPEN,
@@ -121,13 +114,8 @@ enum WindowAction {
   WINDOW_UNKNOWN
 };
 
-
-// ===== VARIABILI GLOBALI PER IL TRACKING =====
 extern WindowAction lastWindowAction;
 
-
-// ===== DICHIARAZIONI DELLE FUNZIONI =====
 void initLogging();
 void logWindowStateChange(bool newState, WindowAction action);
-void logTFavorableChange(bool newValue, int tempIn, int tempOut);
 void setWindowAction(WindowAction action);

@@ -1,4 +1,4 @@
-// timeSync.ino — Sala2
+// timeSync.ino — Sala3
 
 enum SyncMode : uint8_t { SYNC_FAST, SYNC_SLOW };
 
