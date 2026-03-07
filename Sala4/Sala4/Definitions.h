@@ -1,33 +1,46 @@
-const int BUTTON1_PIN =  4;       // Pin del pulsante di apertura
-const int BUTTON2_PIN =  5;       // Pin del pulsante di chiusura
-const int CLOSE_W_PIN =  6;       // Pin dell'attuatore chiudi 
-const int OPEN_W_PIN =   9;       // Pin dell'attuatore apri 
-const byte LED_PIN =    10;       // NeoPixal Led
-const byte LED_COUNT = 16;        // n led NeoPixal
+// Definitions.h — Sala4 (Nano 33 IoT / SAMD21)
+#pragma once
 
-//////////////////////////////////////////////TIMER//////////////////////////////////////////////////////
-const unsigned long AUTOWINDOWS_INTERVAL =        30000;       // timer controllo movimentazione automatica finestre
-const unsigned long SYNC_FAST_INTERVAL =          10000;       // 10 secondi
-const unsigned long SYNC_SLOW_INTERVAL =      3600000UL;       // 1 ora
+// ===================== PIN =====================
+const int  BUTTON1_PIN =  4;       // Pulsante apertura
+const int  BUTTON2_PIN =  5;       // Pulsante chiusura
+const int  CLOSE_W_PIN =  6;       // Attuatore chiudi
+const int  OPEN_W_PIN  =  9;       // Attuatore apri
+const byte LED_PIN     = 10;       // NeoPixel
+const byte LED_COUNT   = 16;       // Numero LED
 
-//////////////////////////////////////////WINDOWS TIMER//////////////////////////////////////////////////
-const int windowMovementTimer =           18000;          // tempo di movimentazione finestre
-const int shortPressTimer =                1500;          // tempo pressione breve del pulsante 
-const unsigned long prolongedPressTimer =  6000;          // Pressione prolungata > 8000ms (8s)
-const int allTimer =                    30*1000;          // durata comando allWindows
+// ===================== SYSTEM STATE =====================
+enum SysState : uint8_t {
+  SYS_BOOT,            // Hardware inizializzato, in attesa del cloud
+  SYS_RUNNING,         // Cloud connesso e sincronizzato
+  SYS_DISCONNECTED     // Connessione cloud persa
+};
 
-//////////////////////////////////////////MAIN VARIABLES/////////////////////////////////////////////////
-int oldSystemState = 0, oldAll = 0;
-bool rst = true;
-int windowState = 0;
-bool syncState = false;
-bool firstSyncDone = false;
-char buf[64];
-bool virtualAutoW = false;  // Indica se le finestre sono state aperte automaticamente
+// ===================== WINDOW STATE MACHINE =====================
+enum WinState : uint8_t {
+  WIN_IDLE,            // Nessun relay attivo
+  WIN_RELAY_PAUSE,     // Pausa 500ms dopo disattivazione relay opposto
+  WIN_MOVING           // Relay attivo, finestra in movimento
+};
 
-//////////////////////////////////////PREVIUS MAIN VARIABLES/////////////////////////////////////////////
-bool prev_isRaining = false;
-bool prev_w_STATE = false;
-bool prev_manualLight = false;
-int prev_allWindows = 0;
-bool firstSync = true;
+enum WinPos : int8_t {
+  WIN_CLOSED  = -1,
+  WIN_TRANSIT =  0,
+  WIN_OPEN    =  1
+};
+
+// ===================== TIMERS =====================
+// System
+const unsigned long DISCONNECT_RESET_MS     = 5UL * 60 * 1000;  // Reset dopo 5 min disconnesso
+
+// Time sync
+const unsigned long SYNC_FAST_INTERVAL      = 10000;             // 10 secondi
+const unsigned long SYNC_SLOW_INTERVAL      = 3600000UL;         // 1 ora
+const uint8_t       SYNC_FAIL_MAX           = 6;
+
+// Windows
+const unsigned long WINDOW_MOVE_MS          = 18000;             // Durata movimentazione finestre
+const unsigned long RELAY_SWITCH_PAUSE_MS   = 500;               // Pausa tra relay opposti
+const unsigned long SHORT_PRESS_MS          = 1500;              // Soglia pressione breve
+const unsigned long LONG_PRESS_MS           = 6000;              // Soglia pressione lunga
+const unsigned long ALL_CMD_TIMEOUT_MS      = 30000UL;           // Timeout comando allWindows
