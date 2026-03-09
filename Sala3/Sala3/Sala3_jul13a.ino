@@ -1,14 +1,13 @@
 // Sala3_jul13a.ino — Nano ESP32
-// Architettura a stati con auto-recovery
-//
-// SYS_BOOT → (cloud sync) → SYS_RUNNING ⇄ SYS_DISCONNECTED
-//                                              ↓ (timeout)
-//                                          ESP.restart()
+// Comunicazione ESP-NOW peer-to-peer
 
 #include "arduino_secrets.h"
 #include <Bounce2.h>
-#include "thingProperties.h"
+#include <WiFi.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
 #include "Definitions.h"
+#include "EspNowProtocol.h"
 #include "Classes.h"
 #include <time.h>
 #include "customSequences.h"
@@ -20,24 +19,22 @@ NP_Led             Led1(LED_COUNT, LED_PIN);
 Bounce2::Button    button1, button2;
 
 // ===================== STATO SISTEMA =====================
-SysState      sysState       = SYS_BOOT;
-bool          syncState      = false;
-bool          firstSyncDone  = false;
-unsigned long disconnectTime = 0;
-char          buf[64];
-
-// ===================== TRACKING VARIABILI CLOUD =====================
-bool prev_w_STATE     = false;
-bool prev_isRaining   = false;
-bool prev_manualLight = false;
-int  prev_allWindows  = 0;
-bool firstSync        = true;
+SysState sysState      = SYS_BOOT;
+WinPos   winPos        = WIN_CLOSED;
+bool     manualLight   = false;
+bool     syncState     = false;
+bool     firstSyncDone = false;
+uint8_t  syncFailCount = 0;
 
 // ===================== SETUP =====================
 void setup() {
-  Serial.begin(19200);
+  Serial.begin(115200);
   delay(1500);
   initLogging();
+
+  Serial.println(F("========================================"));
+  Serial.println(F("  Sala3 — ESP-NOW Edition"));
+  Serial.println(F("========================================"));
 
   // I/O
   button1.attach(BUTTON1_PIN, INPUT_PULLUP);
@@ -49,138 +46,83 @@ void setup() {
   button1.setPressedState(LOW);
   button2.setPressedState(LOW);
 
-  // Cloud
-  initProperties();
-  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
-  setDebugMessageLevel(2);
-  ArduinoCloud.printDebugInfo();
-
-  ArduinoCloud.addCallback(ArduinoIoTCloudEvent::CONNECT, onCloudConnect);
-  ArduinoCloud.addCallback(ArduinoIoTCloudEvent::SYNC, onCloudSync);
-  ArduinoCloud.addCallback(ArduinoIoTCloudEvent::DISCONNECT, onCloudDisconnect);
-
   // LED
   Led1.begin();
   Led1.setContinuousBrightness(20);
   Led1.setSequenceBrightness(200);
+  Led1.startContinuous(0xFFAA00);
   Led1.show();
 
-  Serial.println(F("[SYS] Sala3 avviata - SYS_BOOT"));
-}
+  // WiFi + NTP
+  WiFi.mode(WIFI_STA);
+  configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
+  initWifi();
 
-// ===================== LOOP — STATE MACHINE =====================
-void loop() {
-  ArduinoCloud.update();
-  Led1.update();
-
-  switch (sysState) {
-
-    case SYS_BOOT:
-      updateWindows();
-      break;
-
-    case SYS_RUNNING:
-      cloudTimeSync();
-      updateWindows();
-      checkVariableChanges();
-      checkResetCommand();
-      break;
-
-    case SYS_DISCONNECTED:
-      updateWindows();
-      if (millis() - disconnectTime >= DISCONNECT_RESET_MS) {
-        Serial.println(F("[SYS] Disconnesso troppo a lungo - RESET"));
-        ESP.restart();
-      }
-      break;
-  }
-}
-
-// ===================== CLOUD CALLBACKS =====================
-void onCloudConnect() {
-  Serial.println(F("[CLOUD] Connesso"));
-  Led1.startContinuous(0x00FF00);
-}
-
-void onCloudSync() {
-  Serial.println(F("[CLOUD] Sincronizzato"));
-  Led1.startContinuous(0x0000FF);
-
-  snprintf(buf, sizeof(buf), "Sala3: SYNC allW:%d wPos:%d", allWindows, (int)winPos);
-  messager = buf;
-
-  syncReset();
-  timeSyncTimer.start(SYNC_FAST_INTERVAL);
-  onCloudReconnect();
-
-  sysState = SYS_RUNNING;
-  Serial.println(F("[SYS] -> SYS_RUNNING"));
-}
-
-void onCloudDisconnect() {
-  Serial.println(F("[CLOUD] Disconnesso"));
-  Led1.startContinuous(0xFF0000);
-
-  if (sysState == SYS_RUNNING) {
-    sysState       = SYS_DISCONNECTED;
-    disconnectTime = millis();
-    Serial.println(F("[SYS] -> SYS_DISCONNECTED"));
-  }
-}
-
-// ===================== SYNC RESET =====================
-void syncReset() {
-  winPos = w_STATE ? WIN_OPEN : WIN_CLOSED;
-
-  prev_w_STATE     = w_STATE;
-  prev_isRaining   = isRaining;
-  prev_manualLight = manualLight;
-  prev_allWindows  = allWindows;
-  oldAll           = allWindows;
-}
-
-// ===================== CHECK RESET COMMAND =====================
-void checkResetCommand() {
-  if (messager == "reset" || messager == "reset3") {
-    Serial.println(F("[SYS] Reset richiesto via cloud"));
+  // ESP-NOW
+  if (!initEspNow()) {
+    Serial.println(F("[SYS] ESP-NOW init fallita — RESET tra 5s"));
+    Led1.startContinuous(0xFF0000);
+    delay(5000);
     ESP.restart();
   }
+
+  timeSyncTimer.start(SYNC_FAST_INTERVAL);
+  sysState = SYS_RUNNING;
+  Led1.startContinuous(0x0000FF);
+  Serial.println(F("[SYS] Sala3 avviata — SYS_RUNNING (ESP-NOW)"));
 }
 
-// ===================== VARIABLE CHANGE DETECTION =====================
-void checkVariableChanges() {
-  if (firstSync) {
-    firstSync = false;
-    return;
-  }
+// ===================== LOOP =====================
+void loop() {
+  processEspNow();
+  updateWindows();
+  ntpTimeSync();
+  checkWifiReconnect();
+  Led1.update();
+  updateLedStatus();
+}
 
-  if (w_STATE != prev_w_STATE) {
-    logWindowStateChange(w_STATE, lastWindowAction);
-    lastWindowAction = WINDOW_UNKNOWN;
-    prev_w_STATE = w_STATE;
-  }
+// ===================== NTP TIME SYNC =====================
+void ntpTimeSync() {
+  if (!timeSyncTimer.elapsed()) return;
 
-  if (isRaining != prev_isRaining) {
-    prev_isRaining = isRaining;
-  }
-
-  if (manualLight != prev_manualLight) {
-    if (manualLight) {
-      Led1.start(sequence1, numSteps1);
-    } else {
-      Led1.start(sequence2, numSteps2);
+  struct tm ti;
+  if (getLocalTime(&ti, 100)) {
+    if (!firstSyncDone) {
+      Serial.println(F("[NTP] Sincronizzato"));
+      cal.updateTime();
+      cal.printCurrentTime();
+      Led1.start(sequence5, numSteps5);
+      firstSyncDone = true;
     }
-    prev_manualLight = manualLight;
-  }
-
-  if (allWindows != prev_allWindows) {
-    prev_allWindows = allWindows;
+    syncState     = true;
+    syncFailCount = 0;
+    timeSyncTimer.start(SYNC_SLOW_INTERVAL);
+  } else {
+    syncFailCount++;
+    if (syncFailCount >= SYNC_FAIL_MAX) {
+      syncState = false;
+    }
+    timeSyncTimer.start(SYNC_FAST_INTERVAL);
   }
 }
 
-// ===================== CLOUD CALLBACK STUBS =====================
-void onIsRainingChange()   {}
-void onAllWindowsChange()  {}
-void onMessagerChange()    {}
-void onWSTATEChange()      {}
-void onManualLightChange() {}
+// ===================== LED STATUS =====================
+void updateLedStatus() {
+  static uint32_t lastLedColor = 0;
+  uint32_t color;
+
+  uint8_t online = getOnlinePeerCount();
+  if (online == NUM_SALAS - 1) {
+    color = 0x0000FF;
+  } else if (online > 0) {
+    color = 0x00FF00;
+  } else {
+    color = 0xFFAA00;
+  }
+
+  if (color != lastLedColor) {
+    Led1.startContinuous(color);
+    lastLedColor = color;
+  }
+}

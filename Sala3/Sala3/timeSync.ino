@@ -1,54 +1,63 @@
-// timeSync.ino — Sala3
+// timeSync.ino — Sala4 — NTP Time Sync
+//
+// Usa il client SNTP integrato nell'ESP32.
+// configTzTime() chiamato nel setup() configura timezone e NTP server.
+// getLocalTime() controlla se il tempo è sincronizzato.
+//
+// A differenza della versione cloud:
+//   - Non usa TimeService (Arduino Cloud)
+//   - Non usa ArduinoCloud.getInternalTime()
+//   - NTP funziona in background quando WiFi è disponibile
+//   - Se WiFi non disponibile, ESP-NOW continua a funzionare (solo no NTP)
 
-enum SyncMode : uint8_t { SYNC_FAST, SYNC_SLOW };
+// Questo file è mantenuto per compatibilità strutturale con le altre stanze.
+// La logica NTP è in ntpTimeSync() nel main sketch.
+// Qui ci sono funzioni helper.
 
-SyncMode syncMode      = SYNC_FAST;
-uint8_t  syncFailCount = 0;
+void printNetworkStatus() {
+  char buf[80];
 
-void onCloudReconnect() {
-  syncMode      = SYNC_FAST;
-  syncFailCount = 0;
-  firstSyncDone = false;
-  syncState     = false;
-  timeSyncTimer.start(SYNC_FAST_INTERVAL);
-}
+  Serial.println(F("--- Network Status ---"));
 
-void cloudTimeSync() {
-  if (!timeSyncTimer.elapsed()) return;
+  snprintf(buf, sizeof(buf), "WiFi: %s", isWifiConnected() ? "Connesso" : "Disconnesso");
+  Serial.println(buf);
 
-  bool ok = TimeService.sync();
+  if (isWifiConnected()) {
+    Serial.print(F("  IP: "));
+    Serial.println(WiFi.localIP());
+    snprintf(buf, sizeof(buf), "  Canale: %d", WiFi.channel());
+    Serial.println(buf);
+  }
 
-  if (!ok) {
-    Led1.start(sequence6, numSteps6);
-    Serial.println(F(" [SYNC] Sincronizzazione fallita."));
+  snprintf(buf, sizeof(buf), "NTP:  %s", syncState ? "Sincronizzato" : "Non sincronizzato");
+  Serial.println(buf);
 
-    syncFailCount++;
-    if (syncFailCount >= SYNC_FAIL_MAX) {
-      Serial.println(F(" [SYNC] Troppi tentativi falliti."));
-      Led1.startContinuous(0x8F00FF);
-      syncState = false;
+  if (syncState) {
+    cal.printCurrentTime();
+  }
+
+  snprintf(buf, sizeof(buf), "Peer: %d/%d online", getOnlinePeerCount(), NUM_SALAS - 1);
+  Serial.println(buf);
+
+  for (int i = 0; i < NUM_SALAS; i++) {
+    if (peers[i].salaId == THIS_SALA_ID) continue;
+    const char* status;
+    switch (peers[i].status) {
+      case PEER_ONLINE:  status = "ONLINE";  break;
+      case PEER_OFFLINE: status = "OFFLINE"; break;
+      default:           status = "UNKNOWN"; break;
     }
-    timeSyncTimer.start(SYNC_FAST_INTERVAL);
-    syncMode = SYNC_FAST;
-    return;
+    snprintf(buf, sizeof(buf), "  Sala%d: %s", peers[i].salaId, status);
+    Serial.println(buf);
+
+    if (peers[i].stateValid) {
+      snprintf(buf, sizeof(buf), "    Win: %d, Rain: %s, Light: %s",
+        (int)peers[i].lastState.winPos,
+        peers[i].lastState.isRaining ? "SI" : "NO",
+        peers[i].lastState.lightState ? "ON" : "OFF");
+      Serial.println(buf);
+    }
   }
 
-  // Sync riuscita
-  if (!firstSyncDone) {
-    Serial.println(F(" [SYNC] Sincronizzazione completata."));
-    cal.updateTime();
-    Led1.start(sequence5, numSteps5);
-  } else {
-    Serial.println(F(" [SYNC] Orologio aggiornato."));
-    cal.updateTime();
-  }
-
-  Serial.print(F(" RTC: "));
-  cal.printCurrentTime();
-
-  syncFailCount = 0;
-  syncState     = true;
-  firstSyncDone = true;
-  syncMode      = SYNC_SLOW;
-  timeSyncTimer.start(SYNC_SLOW_INTERVAL);
+  Serial.println(F("----------------------"));
 }
