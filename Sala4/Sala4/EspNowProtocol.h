@@ -1,5 +1,5 @@
 // EspNowProtocol.h — Protocollo di comunicazione ESP-NOW
-// Condiviso tra tutte le stanze. Ogni stanza cambia solo THIS_SALA_ID.
+// Condiviso tra tutte le stanze. Cambia solo THIS_SALA_ID.
 #pragma once
 
 #include <Arduino.h>
@@ -35,22 +35,20 @@ enum PeerStatus : uint8_t {
 // ===================== MESSAGGI (packed, no padding) =====================
 
 struct __attribute__((packed)) MsgHeader {
-  uint8_t  type;        // MsgType
-  uint8_t  salaId;      // ID stanza mittente (1-4)
-  uint32_t timestamp;   // millis() del mittente
+  uint8_t  type;
+  uint8_t  salaId;
+  uint32_t timestamp;
 };
 
-// Ping/Pong — heartbeat attivo
 struct __attribute__((packed)) PingPongMsg {
   MsgHeader hdr;
-  uint8_t   targetSala;  // PONG: sala che ha chiesto il ping. PING: 0
+  uint8_t   targetSala;
 };
 
-// Stato stanza — broadcast periodico + su cambio stato
 struct __attribute__((packed)) StateMsg {
   MsgHeader hdr;
-  int8_t    winPos;       // WIN_CLOSED(-1), WIN_TRANSIT(0), WIN_OPEN(1)
-  uint8_t   sysState;     // SysState enum
+  int8_t    winPos;
+  uint8_t   sysState;
   bool      isRaining;
   bool      lightState;
   bool      manualLight;
@@ -59,33 +57,61 @@ struct __attribute__((packed)) StateMsg {
   int16_t   temperature;
 };
 
-// Comando — broadcast o diretto a una stanza
 struct __attribute__((packed)) CommandMsg {
   MsgHeader hdr;
-  uint8_t   targetSala;   // 0 = broadcast a tutte
-  uint8_t   cmdType;      // CmdType
-  int32_t   cmdValue;     // Valore opzionale
+  uint8_t   targetSala;
+  uint8_t   cmdType;
+  int32_t   cmdValue;
 };
 
 // ===================== INFO PEER =====================
 struct PeerInfo {
   uint8_t    salaId;
   PeerStatus status;
-  uint32_t   lastSeen;     // millis() ultima ricezione
-  StateMsg   lastState;    // Ultimo stato ricevuto
-  bool       stateValid;   // Almeno uno stato ricevuto
+  uint32_t   lastSeen;
+  StateMsg   lastState;
+  bool       stateValid;
 };
 
 // ===================== MESSAGGIO RICEVUTO (coda FreeRTOS) =====================
 struct ReceivedMsg {
   uint8_t mac[6];
-  uint8_t data[250];      // ESP-NOW max payload
+  uint8_t data[250];
   uint8_t len;
 };
 
+// ===================== COMANDO GLOBALE PENDENTE =====================
+struct PendingGlobalCmd {
+  bool     active;
+  uint8_t  cmdType;
+  int8_t   expectedPos;
+  uint32_t startTime;
+  uint32_t lastRetry;
+  bool     confirmed[NUM_SALAS];
+};
+
+// ===================== FRAM MB85RC256V =====================
+const uint8_t  FRAM_I2C_ADDR   = 0x50;
+const uint16_t FRAM_STATE_ADDR = 0x0000;
+const uint8_t  FRAM_MAGIC      = 0xA5;
+
+struct __attribute__((packed)) SavedState {
+  uint8_t magic;
+  int8_t  winPos;
+  bool    manualLight;
+  uint8_t checksum;
+};
+
 // ===================== COSTANTI PROTOCOLLO =====================
-const unsigned long PING_INTERVAL_MS     = 5000;
-const unsigned long STATE_BROADCAST_MS   = 5000;
-const unsigned long PEER_TIMEOUT_MS      = 15000;
-const unsigned long WIFI_RECONNECT_MS    = 30000;
-const uint8_t       RX_QUEUE_SIZE        = 16;
+const unsigned long PING_INTERVAL_MS       = 5000;
+const unsigned long STATE_BROADCAST_MS     = 5000;
+const unsigned long PEER_TIMEOUT_MS        = 15000;
+const unsigned long WIFI_RECONNECT_MS      = 30000;
+const uint8_t       RX_QUEUE_SIZE          = 16;
+
+// Retry comandi globali
+const unsigned long CMD_RETRY_INTERVAL_MS  = 30000;
+const unsigned long CMD_RETRY_TIMEOUT_MS   = 5UL * 60 * 1000;
+
+// Chiusura sicurezza offline
+const unsigned long OFFLINE_SAFETY_MS      = 5UL * 60 * 1000;

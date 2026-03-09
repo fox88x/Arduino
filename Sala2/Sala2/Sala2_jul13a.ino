@@ -1,9 +1,15 @@
 // Sala2_jul13a.ino — Nano ESP32
 // Comunicazione ESP-NOW peer-to-peer
+//
+// FRAM MB85RC256V per persistenza stato
+// Comando globale con retry 30s/5min
+// Sicurezza offline: chiusura dopo 5min senza peer
+// LED semplificato: blu/arancione/rosso
 
 #include "arduino_secrets.h"
 #include <Bounce2.h>
 #include <WiFi.h>
+#include <Wire.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include "Definitions.h"
@@ -46,12 +52,22 @@ void setup() {
   button1.setPressedState(LOW);
   button2.setPressedState(LOW);
 
-  // LED
+  // LED — flash blu alta intensità al boot
   Led1.begin();
-  Led1.setContinuousBrightness(20);
   Led1.setSequenceBrightness(200);
+  Led1.setContinuousBrightness(200);
+  Led1.startContinuous(0x0000FF);
+  Led1.show();
+  delay(500);
+  Led1.setContinuousBrightness(20);
   Led1.startContinuous(0xFFAA00);
   Led1.show();
+
+  // FRAM — persistenza stato
+  initFram();
+  if (loadState()) {
+    Serial.println(F("[SYS] Stato ripristinato da FRAM"));
+  }
 
   // WiFi + NTP
   WiFi.mode(WIFI_STA);
@@ -68,8 +84,12 @@ void setup() {
 
   timeSyncTimer.start(SYNC_FAST_INTERVAL);
   sysState = SYS_RUNNING;
-  Led1.startContinuous(0x0000FF);
   Serial.println(F("[SYS] Sala2 avviata — SYS_RUNNING (ESP-NOW)"));
+
+  Serial.print(F("[SYS] MAC: "));
+  Serial.println(WiFi.macAddress());
+  Serial.print(F("[SYS] Peer attesi: "));
+  Serial.println(NUM_SALAS - 1);
 }
 
 // ===================== LOOP =====================
@@ -89,10 +109,9 @@ void ntpTimeSync() {
   struct tm ti;
   if (getLocalTime(&ti, 100)) {
     if (!firstSyncDone) {
-      Serial.println(F("[NTP] Sincronizzato"));
+      Serial.println(F("[NTP] Prima sincronizzazione completata"));
       cal.updateTime();
       cal.printCurrentTime();
-      Led1.start(sequence5, numSteps5);
       firstSyncDone = true;
     }
     syncState     = true;
@@ -100,6 +119,9 @@ void ntpTimeSync() {
     timeSyncTimer.start(SYNC_SLOW_INTERVAL);
   } else {
     syncFailCount++;
+    if (syncFailCount <= 3) {
+      Serial.println(F("[NTP] Sincronizzazione fallita"));
+    }
     if (syncFailCount >= SYNC_FAIL_MAX) {
       syncState = false;
     }
@@ -108,17 +130,20 @@ void ntpTimeSync() {
 }
 
 // ===================== LED STATUS =====================
+// Blu:      tutti i peer online + nessun comando pendente
+// Arancione: alcuni peer offline o comando pendente
+// Rosso:    nessun peer online (isolata)
 void updateLedStatus() {
   static uint32_t lastLedColor = 0;
   uint32_t color;
 
   uint8_t online = getOnlinePeerCount();
-  if (online == NUM_SALAS - 1) {
-    color = 0x0000FF;
-  } else if (online > 0) {
-    color = 0x00FF00;
-  } else {
+  if (online == 0) {
+    color = 0xFF0000;
+  } else if (online < NUM_SALAS - 1 || hasPendingCommands()) {
     color = 0xFFAA00;
+  } else {
+    color = 0x0000FF;
   }
 
   if (color != lastLedColor) {

@@ -1,11 +1,7 @@
-// windowsManagment.ino — Sala4 — State Machine Finestre (ESP-NOW)
-//
-// Rispetto alla versione cloud:
-//   - Pressione lunga: invia CMD_ALL_OPEN/CLOSE via ESP-NOW (non più variabile cloud)
-//   - Comandi remoti arrivano via handleCommand() in EspNowComm.ino
-//   - Nessun polling di allWindows — eventi diretti
+// windowsManagment.ino — State Machine Finestre (ESP-NOW)
 //
 // Stati: WIN_IDLE → WIN_RELAY_PAUSE → WIN_MOVING → WIN_IDLE
+// Salva stato su FRAM dopo ogni movimentazione completata.
 
 // ===================== STATO FINESTRE =====================
 WinState      winState   = WIN_IDLE;
@@ -15,6 +11,11 @@ unsigned long winTimer   = 0;
 // ===================== PULSANTI =====================
 unsigned long btn1Start  = 0;
 unsigned long btn2Start  = 0;
+
+// ===================== HELPER =====================
+bool isWindowIdle() {
+  return winState == WIN_IDLE;
+}
 
 // ===================== BUTTON HANDLER =====================
 void processButton(Bounce2::Button& btn, unsigned long& startTime, int relayPin, int btnId) {
@@ -33,11 +34,10 @@ void processButton(Bounce2::Button& btn, unsigned long& startTime, int relayPin,
     else if (dur < LONG_PRESS_MS) {
       // Pressione lunga: comando apertura/chiusura TOTALE via ESP-NOW
       CmdType cmd = (relayPin == OPEN_W_PIN) ? CMD_ALL_OPEN : CMD_ALL_CLOSE;
-      sendCommand(cmd, 0, 0);   // Broadcast a tutte le stanze
+      sendGlobalCommand(cmd);
 
       setWindowAction((relayPin == OPEN_W_PIN) ? WINDOW_SEND_ALL_OPEN : WINDOW_SEND_ALL_CLOSE);
-      activateRelay(relayPin);  // Muovi anche la propria finestra
-      Led1.start(sequence11, numSteps11);
+      activateRelay(relayPin);
 
       Serial.print(F("[WIN] Comando totale inviato: "));
       Serial.println(cmd == CMD_ALL_OPEN ? F("APERTURA") : F("CHIUSURA"));
@@ -46,6 +46,7 @@ void processButton(Bounce2::Button& btn, unsigned long& startTime, int relayPin,
       // Pressione molto lunga: toggle manualLight (solo pulsante 2)
       if (btnId == 2) {
         manualLight = !manualLight;
+        saveState();
         notifyStateChanged();
         Serial.print(F("[WIN] ManualLight: "));
         Serial.println(manualLight ? F("ON") : F("OFF"));
@@ -56,7 +57,7 @@ void processButton(Bounce2::Button& btn, unsigned long& startTime, int relayPin,
 
 // ===================== ATTIVAZIONE RELAY =====================
 void activateRelay(int relayPin) {
-  if (winState == WIN_MOVING) return;
+  if (winState != WIN_IDLE) return;
 
   // Disattiva relay opposto prima di attivare quello richiesto
   int opposite = (relayPin == OPEN_W_PIN) ? CLOSE_W_PIN : OPEN_W_PIN;
@@ -79,7 +80,6 @@ void updateWindows() {
       break;
 
     case WIN_RELAY_PAUSE:
-      // Pausa di sicurezza tra disattivazione relay opposto e attivazione nuovo
       if (now - winTimer >= RELAY_SWITCH_PAUSE_MS) {
         digitalWrite(pendingPin, HIGH);
         winTimer = now;
@@ -90,7 +90,6 @@ void updateWindows() {
       break;
 
     case WIN_MOVING:
-      // Finestra in movimento — attendi completamento
       if (now - winTimer >= WINDOW_MOVE_MS) {
         digitalWrite(pendingPin, LOW);
 
@@ -102,9 +101,9 @@ void updateWindows() {
 
         pendingPin = 0;
         winState   = WIN_IDLE;
+        saveState();
         notifyStateChanged();
 
-        // Log
         logWindowStateChange(winPos == WIN_OPEN, lastWindowAction);
         lastWindowAction = WINDOW_UNKNOWN;
       }

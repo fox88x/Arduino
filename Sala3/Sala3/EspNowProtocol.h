@@ -80,9 +80,38 @@ struct ReceivedMsg {
   uint8_t len;
 };
 
+// ===================== COMANDO GLOBALE PENDENTE =====================
+struct PendingGlobalCmd {
+  bool     active;
+  uint8_t  cmdType;
+  int8_t   expectedPos;
+  uint32_t startTime;
+  uint32_t lastRetry;
+  bool     confirmed[NUM_SALAS];
+};
+
+// ===================== FRAM MB85RC256V =====================
+const uint8_t  FRAM_I2C_ADDR   = 0x50;
+const uint16_t FRAM_STATE_ADDR = 0x0000;
+const uint8_t  FRAM_MAGIC      = 0xA5;
+
+struct __attribute__((packed)) SavedState {
+  uint8_t magic;
+  int8_t  winPos;
+  bool    manualLight;
+  uint8_t checksum;
+};
+
 // ===================== COSTANTI PROTOCOLLO =====================
-const unsigned long PING_INTERVAL_MS     = 5000;
-const unsigned long STATE_BROADCAST_MS   = 5000;
-const unsigned long PEER_TIMEOUT_MS      = 15000;
-const unsigned long WIFI_RECONNECT_MS    = 30000;
-const uint8_t       RX_QUEUE_SIZE        = 16;
+const unsigned long PING_INTERVAL_MS       = 5000;
+const unsigned long STATE_BROADCAST_MS     = 5000;
+const unsigned long PEER_TIMEOUT_MS        = 15000;
+const unsigned long WIFI_RECONNECT_MS      = 30000;
+const uint8_t       RX_QUEUE_SIZE          = 16;
+
+// Retry comandi globali
+const unsigned long CMD_RETRY_INTERVAL_MS  = 30000;
+const unsigned long CMD_RETRY_TIMEOUT_MS   = 5UL * 60 * 1000;
+
+// Chiusura sicurezza offline
+const unsigned long OFFLINE_SAFETY_MS      = 5UL * 60 * 1000;
