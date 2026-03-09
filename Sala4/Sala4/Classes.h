@@ -1,4 +1,4 @@
-// Classes.h — Sala4
+// Classes.h — Sala4 (ESP-NOW)
 #pragma once
 
 #include <Arduino.h>

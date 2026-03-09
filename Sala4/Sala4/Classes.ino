@@ -1,10 +1,12 @@
-// Classes.ino — Sala4
+// Classes.ino — Sala4 (ESP-NOW)
+//
+// Differenze dalla versione cloud:
+//   - Calendar usa getLocalTime() (ESP32 NTP) invece di TimeService (Arduino Cloud)
+//   - Logging su Serial (niente messager cloud)
 
 #include "Classes.h"
 
-// Variabili globali definite nel main sketch
 extern bool syncState;
-extern String messager;
 
 // ------------------------------------
 // Timers
@@ -53,11 +55,10 @@ void OneShotTimer::stop() {
 }
 
 // ------------------------------------
-// Calendar
+// Calendar — NTP via ESP32
 // ------------------------------------
 void Calendar::updateTime() {
-  time_t epoch = TimeService.getLocalTime();
-  gmtime_r(&epoch, &timeinfo);
+  getLocalTime(&timeinfo, 10);
 }
 
 bool Calendar::isWorkingDay() {
@@ -87,7 +88,7 @@ bool Calendar::isWorkingTime() {
 
 void Calendar::printCurrentTime() {
   updateTime();
-  char buffer[26];
+  char buffer[32];
   snprintf(buffer, sizeof(buffer), " %02d/%02d/%04d  %02d:%02d:%02d",
     timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
     timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
@@ -166,7 +167,7 @@ void NP_Led::show() {
 }
 
 // ------------------------------------
-// Log
+// Log — Serial only (no cloud messager)
 // ------------------------------------
 WindowAction lastWindowAction = WINDOW_UNKNOWN;
 
@@ -189,9 +190,9 @@ void logWindowStateChange(bool newState, WindowAction action) {
     case WINDOW_ALL_CLOSE:          causa = "Chiusura TOTALE (remoto)"; break;
     default:                        causa = "SCONOSCIUTA"; break;
   }
-  char msg[96];
-  snprintf(msg, sizeof(msg), "Sala4:\n[Win] %s\nStato: %s", causa, newState ? "APERTE" : "CHIUSE");
-  messager = msg;
+  char msg[80];
+  snprintf(msg, sizeof(msg), "[WIN] %s — Stato: %s", causa, newState ? "APERTE" : "CHIUSE");
+  Serial.println(msg);
 }
 
 void setWindowAction(WindowAction action) {
